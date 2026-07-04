@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>brow — voice</title>
+<style>
+  /* ── Nocturne theme — reskin everything from here ───────────────── */
+  :root {
+    --bg:        #120d1c;   /* deep plum-indigo night */
+    --bg-glow-1: #b98cff22; /* violet haze  */
+    --bg-glow-2: #5ce0e01c; /* aqua haze    */
+    --surface:   #1c1528;
+    --surface-2: #241b33;
+    --border:    #34273f;
+    --border-soft:#2a2036;
+    --text:      #f2edf6;   /* soft off-white */
+    --muted:     #a79db8;   /* lavender-gray */
+    --faint:     #6f6580;
+    --accent:    #b98cff;   /* violet */
+    --accent-2:  #5ce0e0;   /* aqua   */
+    --accent-3:  #ff7ab8;   /* magenta-pink */
+    --grad:      linear-gradient(120deg, #b98cff, #ff7ab8);
+    --grad-soft: linear-gradient(120deg, #b98cff33, #5ce0e02b);
+    --glow:      #b98cff55;
+    --danger:    #ff6b8a;
+    --radius:    14px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+    /* two soft light sources for depth */
+    background-image:
+      radial-gradient(60% 45% at 18% -5%, var(--bg-glow-1), transparent 70%),
+      radial-gradient(55% 45% at 92% 8%, var(--bg-glow-2), transparent 70%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 20px 64px; }
+
+  /* ── Hero ───────────────────────────────────────────────────────── */
+  .hero { text-align: center; padding: 40px 8px 24px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .brand .dot {
+    width: 30px; height: 30px; border-radius: 9px; background: var(--grad);
+    box-shadow: 0 0 24px var(--glow);
+  }
+  .brand h1 {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.03em;
+    background: linear-gradient(120deg, #fff 20%, #e6d9ff 55%, #cdefff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tagline { color: var(--muted); font-size: 15px; max-width: 46ch; margin: 0 auto 30px; }
+  .tagline b { color: var(--text); font-weight: 600; }
+
+  /* mic — the centerpiece */
+  #mic {
+    position: relative; display: inline-flex; align-items: center; gap: 10px;
+    padding: 15px 30px; font-size: 16px; font-weight: 600; font-family: inherit;
+    color: #fff; border: none; border-radius: 999px; cursor: pointer;
+    background: var(--grad);
+    box-shadow: 0 8px 30px -6px var(--glow), inset 0 1px 0 #ffffff55;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  #mic:hover { transform: translateY(-1px); box-shadow: 0 12px 36px -6px var(--glow), inset 0 1px 0 #ffffff55; }
+  #mic:active { transform: translateY(0); }
+  #mic.live {
+    color: #fff; background: linear-gradient(120deg, #ff5c9d, #b98cff);
+    animation: breathe 1.6s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { box-shadow: 0 0 0 0 #ff5c9d55, 0 8px 30px -6px var(--glow); }
+    50%      { box-shadow: 0 0 0 14px #ff5c9d00, 0 8px 30px -6px var(--glow); }
+  }
+
+  #transcript {
+    min-height: 30px; font-size: 19px; margin: 22px auto 6px; max-width: 52ch;
+    color: var(--text); font-weight: 500;
+  }
+  #transcript:empty::before { content: "Listening for your command…"; color: var(--faint); font-weight: 400; }
+  #transcript.interim { color: var(--muted); font-weight: 400; }
+  #status { color: var(--accent-2); font-size: 13px; min-height: 18px; letter-spacing: 0.02em; }
+  #status:not(:empty)::before { content: "◇ "; }
+
+  /* ── Cards ──────────────────────────────────────────────────────── */
+  section {
+    background: linear-gradient(180deg, var(--surface), var(--surface-2));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px; margin-bottom: 16px;
+    box-shadow: 0 1px 0 #ffffff0a inset, 0 12px 30px -20px #000;
+  }
+  h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--faint); margin-bottom: 12px; font-weight: 600;
+  }
+
+  /* assistant voice bubble */
+  .assistant { display: flex; gap: 12px; align-items: flex-start; }
+  .assistant .avatar {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--grad); box-shadow: 0 0 16px var(--glow); margin-top: 1px;
+  }
+  #narration { color: var(--text); font-size: 15px; min-height: 20px; }
+  #narration.speaking { color: var(--accent-2); }
+
+  /* JobRequest */
+  #jobreq, #question, #qa { display: none; }
+  #jobreq pre {
+    background: #0d0916; border: 1px solid var(--border-soft); border-radius: 10px;
+    padding: 14px; overflow-x: auto; font-size: 13px; line-height: 1.6;
+    color: #e0d4ff; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  /* Interview */
+  #question .q { font-size: 18px; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+  #question .progress { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  #question .progress::before {
+    content: ""; flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* Q&A bank */
+  #qa table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #qa td { padding: 10px 8px; border-top: 1px solid var(--border-soft); vertical-align: top; }
+  #qa tr:first-child td { border-top: none; }
+  #qa td:first-child {
+    color: var(--accent-2); white-space: nowrap; font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; padding-right: 18px; padding-top: 12px;
+  }
+
+  /* Resume input */
+  textarea {
+    width: 100%; height: 130px; background: #0d0916; color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    font-size: 13px; line-height: 1.5; resize: vertical; font-family: var(--font);
+  }
+  textarea::placeholder { color: var(--faint); }
+  textarea:focus { outline: none; border-color: var(--accent-3); box-shadow: 0 0 0 3px #c48bff22; }
+  #startInterview {
+    margin-top: 12px; padding: 10px 18px; font-size: 14px; font-weight: 600; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+    background: var(--surface-2); color: var(--text); transition: border-color .15s, background .15s;
+  }
+  #startInterview:hover { border-color: var(--accent-3); background: #2e2340; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <div class="brand"><span class="dot"></span><h1>brow</h1></div>
+  <p class="tagline"><b>Your voice, applying for you.</b> Speak a command, or paste a résumé to start the onboarding interview.</p>
+  <button id="mic">🎙 Start talking</button>
+  <div id="transcript" class="interim"></div>
+  <div id="status"></div>
+</header>
+
+<section>
+  <h2>Assistant</h2>
+  <div class="assistant"><span class="avatar"></span><div id="narration">—</div></div>
+</section>
+
+<section id="question">
+  <h2>Interview</h2>
+  <div class="q"></div>
+  <div class="progress"></div>
+</section>
+
+<section id="jobreq">
+  <h2>Parsed JobRequest</h2>
+  <pre></pre>
+</section>
+
+<section id="qa">
+  <h2>Q&amp;A bank (saved — asked once, ever)</h2>
+  <table></table>
+</section>
+
+<section>
+  <h2>Resume</h2>
+  <textarea id="resume" placeholder="Paste resume text here…"></textarea>
+  <button id="startInterview">Start onboarding interview</button>
+</section>
+
+<script>
+const ws = new WebSocket(`ws://${location.host}/ws`);
+const $ = (s) => document.querySelector(s);
+let recorder = null, listening = false;
+
+async function startMic() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+  recorder.ondataavailable = (e) => {
+    if (e.data.size > 0 && ws.readyState === 1) e.data.arrayBuffer().then((b) => ws.send(b));
+  };
+  ws.send(JSON.stringify({ type: "start_listening" }));
+  recorder.start(250);
+  listening = true;
+  $("#mic").textContent = "⏹ Stop — I'm done";
+  $("#mic").classList.add("live");
+  $("#transcript").textContent = "";
+}
+
+function stopMic() {
+  recorder?.stop();
+  recorder?.stream.getTracks().forEach((t) => t.stop());
+  recorder = null;
+  listening = false;
+  setTimeout(() => ws.send(JSON.stringify({ type: "stop_listening" })), 300);
+  $("#mic").textContent = "🎙 Start talking";
+  $("#mic").classList.remove("live");
+}
+
+$("#mic").onclick = () => (listening ? stopMic() : startMic());
+
+$("#startInterview").onclick = () => {
+  const text = $("#resume").value.trim();
+  if (!text) return alert("Paste resume text first");
+  ws.send(JSON.stringify({ type: "resume", text }));
+};
+
+async function speak(text) {
+  const el = $("#narration");
+  el.textContent = text;
+  try {
+    const res = await fetch("/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return;
+    const audio = new Audio(URL.createObjectURL(await res.blob()));
+    el.classList.add("speaking");
+    audio.onended = () => el.classList.remove("speaking");
+    await audio.play();
+  } catch { el.classList.remove("speaking"); }
+}
+
+ws.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  if (msg.type === "transcript") {
+    $("#transcript").textContent = msg.text;
+    $("#transcript").className = msg.final ? "" : "interim";
+  } else if (msg.type === "narrate") {
+    speak(msg.text);
+  } else if (msg.type === "status") {
+    $("#status").textContent = msg.text;
+  } else if (msg.type === "job_request") {
+    $("#status").textContent = "";
+    $("#jobreq").style.display = "block";
+    $("#jobreq pre").textContent = JSON.stringify(msg.data, null, 2);
+  } else if (msg.type === "question") {
+    $("#status").textContent = "";
+    $("#question").style.display = "block";
+    $("#question .q").textContent = msg.question;
+    $("#question .progress").textContent = `Question ${msg.index + 1} of ${msg.total} · field: ${msg.field}`;
+  } else if (msg.type === "interview_done") {
+    $("#question").style.display = "none";
+    $("#qa").style.display = "block";
+    $("#qa table").innerHTML = msg.answers
+      .map((a) => `<tr><td>${a.field}</td><td>${a.answer}</td></tr>`)
+      .join("");
+  } else if (msg.type === "error") {
+    $("#status").textContent = "Error: " + msg.error;
+  }
+};
+</script>
+</div>
+</body>
+</html>

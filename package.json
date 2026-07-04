@@ -1,0 +1,33 @@
+{
+  "name": "brow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsx src/server.ts",
+    "build": "tsc",
+    "apply": "tsx src/apply.ts",
+    "trends": "tsx src/trends.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@deepgram/sdk": "^4.11.3",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "openai": "^6.45.0",
+    "playwright": "^1.61.1",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.22.5",
+    "typescript": "^6.0.3"
+  }
+}
