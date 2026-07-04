@@ -4,10 +4,6 @@ Point an AI agent at real fashion sources by voice or by typing, and it finds th
 on-topic looks worth knowing, verifies them with a vision model, and sends them
 straight to Telegram.
 
-The UI lives in `trendy/app/` (Next.js); the agent and voice layer live in `src/`
-(a plain Node/Express + WebSocket backend). They're two separate processes that talk
-over a WebSocket — the UI streams live status and captures while the agent works.
-
 ## Pipeline
 
 1. **Request** — a spoken or typed request from the UI is transcribed (Deepgram) and
