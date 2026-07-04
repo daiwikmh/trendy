@@ -77,31 +77,48 @@ function HeroVideo() {
 
 function Navbar() {
   return (
-    <div className="relative z-20 px-6 py-6">
-      <div className="liquid-glass rounded-full max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center">
+    <header className="relative z-20 px-6 py-6">
+      <nav className="liquid-glass max-w-6xl mx-auto rounded-full px-8 py-4 flex items-center justify-between">
+        {/* Logo */}
+        <a href="#" className="flex items-center gap-2">
           <Globe className="w-6 h-6 text-white" />
-          <span className="ml-2 text-white font-semibold text-lg">trendy</span>
-          <div className="hidden md:flex items-center gap-8 ml-8">
-            <a href="#about" className="text-white/80 hover:text-white text-sm font-medium transition-colors">
-              Features
-            </a>
-            <a href="#services" className="text-white/80 hover:text-white text-sm font-medium transition-colors">
-              Pricing
-            </a>
-            <a href="#about" className="text-white/80 hover:text-white text-sm font-medium transition-colors">
-              About
-            </a>
-          </div>
+          <span className="text-lg font-semibold text-white tracking-tight">
+            trendy
+          </span>
+        </a>
+
+        <div className="hidden md:flex items-center gap-10">
+          <a
+            href="#about"
+            className="text-sm text-white/70 hover:text-white transition-colors"
+          >
+            How it Works
+          </a>
+
+          <a
+            href="#terminal"
+            className="text-sm text-white/70 hover:text-white transition-colors"
+          >
+            Demo
+          </a>
+
+          <a
+            href="#services"
+            className="text-sm text-white/70 hover:text-white transition-colors"
+          >
+            About
+          </a>
         </div>
-        <div className="flex items-center gap-4">
-          <button className="text-white text-sm font-medium">Sign Up</button>
-          <button className="liquid-glass rounded-full px-6 py-2 text-white text-sm font-medium">
-            Login
-          </button>
-        </div>
-      </div>
-    </div>
+
+        {/* CTA */}
+        <a
+          href="#terminal"
+          className="rounded-full bg-white text-black px-5 py-2.5 text-sm font-medium hover:scale-[1.02] transition-transform"
+        >
+          Try Trendy
+        </a>
+      </nav>
+    </header>
   );
 }
 

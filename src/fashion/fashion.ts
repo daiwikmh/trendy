@@ -5,8 +5,9 @@ import { fileURLToPath } from "url";
 import { z } from "zod";
 import { jsonChat } from "../shared/llm.js";
 import { observeContent, serializeContent } from "../shared/perception.js";
-import { analyzeLook, visionEnabled } from "../shared/vision.js";
+import { analyzeLook, visionEnabled, inferGender, type LookAnalysis } from "../shared/vision.js";
 import { sendPhoto, telegramConfigured } from "./telegram.js";
+import { scoutInstagram, findArticleUrls } from "./instagram.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,17 @@ const ActionSchema = z.object({
   reason: z.string().default(""),
 });
 type Action = z.infer<typeof ActionSchema>;
+
+const DEFAULT_SITES = [
+  "https://hypebeast.com/fashion",
+  "https://www.highsnobiety.com",
+  "https://www.vogue.com/fashion",
+  "https://www.vogue.com/fashion-shows",
+  "https://wwd.com/",
+  "https://www.dazeddigital.com",
+  "https://i-d.co",
+  "https://www.businessoffashion.com",
+];
 
 const SYSTEM = `You are trendy, a fashion trend scout browsing an editorial fashion site in a real browser. Your job: find striking, on-topic design looks and CAPTURE them (a screenshot is sent to the user's Telegram).
 
@@ -45,6 +57,13 @@ export interface ScoutResult {
   runDir: string;
 }
 
+export interface FallbackCandidate {
+  shot: Buffer;
+  caption: string;
+  source: string;
+  gender: LookAnalysis["gender"];
+}
+
 export async function scoutTrends(
   topic: string,
   opts: {
@@ -54,40 +73,152 @@ export async function scoutTrends(
     target?: number;
     onEvent?: (msg: string) => void;
     onCapture?: (c: CaptureLog) => void;
+    shouldStop?: () => boolean;
+    timeBudgetMs?: number;
   } = {}
 ): Promise<ScoutResult> {
   const {
-    startUrl = "https://hypebeast.com/fashion",
+    startUrl,
     headless = false,
     maxSteps = 30,
     target = 5,
     onEvent = (m) => console.log(m),
     onCapture,
+    shouldStop = () => false,
+    timeBudgetMs = 120000,
   } = opts;
+
+  const deadline = Date.now() + timeBudgetMs;
+
+  // Try the requested/default site first; fall through to the rest if the
+  // scout gets stuck (no page changes after repeated actions).
+  let sites = startUrl ? [startUrl, ...DEFAULT_SITES.filter((u) => u !== startUrl)] : [...DEFAULT_SITES];
+  let siteIdx = 0;
 
   const runDir = path.join(__dirname, "..", "..", "data", "captures", new Date().toISOString().replace(/[:.]/g, "-"));
   mkdirSync(runDir, { recursive: true });
   const useTelegram = telegramConfigured();
-  onEvent(`scouting "${topic}" — start: ${startUrl} — delivery: ${useTelegram ? "Telegram" : "saved to folder (Telegram not configured)"} — vision gate: ${visionEnabled() ? "on" : "off"}`);
+  const captures: CaptureLog[] = [];
+  const capturedSrcs = new Set<string>();
+  const fallbackCandidates: FallbackCandidate[] = [];
+
+  async function deliverFallback(): Promise<void> {
+    if (captures.length > 0 || fallbackCandidates.length === 0) return;
+    const wantGender = inferGender(topic);
+    const pick =
+      fallbackCandidates.find((c) => !wantGender || c.gender === wantGender || c.gender === "unisex") ??
+      fallbackCandidates[0];
+    const file = path.join(runDir, "capture-01.jpg");
+    writeFileSync(file, pick.shot);
+    let delivered: CaptureLog["delivered"] = "saved";
+    if (useTelegram) {
+      await sendPhoto(pick.shot, `${pick.caption} (closest match found — not a full match)\n\n${pick.source}`);
+      delivered = "telegram";
+    }
+    onEvent(`  no strong match found — sending closest ${pick.gender} look instead: ${pick.caption}`);
+    const log: CaptureLog = { n: 1, caption: `${pick.caption} (closest match)`, delivered, file };
+    captures.push(log);
+    onCapture?.(log);
+  }
+
+  const igCaptures = await scoutInstagram(topic, {
+    target,
+    runDir,
+    onEvent,
+    onCapture,
+    capturedSrcs,
+    captureOffset: 0,
+    fallbackCandidates,
+    deadline,
+  });
+  captures.push(...igCaptures);
+
+  if (captures.length >= target) {
+    writeFileSync(
+      path.join(runDir, "captures.json"),
+      JSON.stringify({ topic, startUrl: null, sitesVisited: [], instagram: true, captures }, null, 2)
+    );
+    return { captures, steps: 0, runDir };
+  }
+
+  if (Date.now() >= deadline) {
+    onEvent(`  ⏱ time budget reached — delivering the closest match found`);
+    await deliverFallback();
+    writeFileSync(
+      path.join(runDir, "captures.json"),
+      JSON.stringify({ topic, startUrl: null, sitesVisited: [], instagram: true, timedOut: true, captures }, null, 2)
+    );
+    return { captures, steps: 0, runDir };
+  }
+
+  if (!startUrl) {
+    const domains = DEFAULT_SITES.map((u) => new URL(u).hostname.replace(/^www\./, ""));
+    onEvent(`searching for on-topic articles about "${topic}"…`);
+    try {
+      const articleUrls = await findArticleUrls(topic, domains, 5);
+      if (articleUrls.length) {
+        onEvent(`  found ${articleUrls.length} article(s) to open directly`);
+        sites = [...articleUrls, ...sites];
+      } else {
+        onEvent(`  no direct articles found — browsing site homepages`);
+      }
+    } catch (err) {
+      onEvent(`  ! article search failed: ${String(err).split("\n")[0]}`);
+    }
+  }
+
+  onEvent(`scouting "${topic}" — start: ${sites[0]} — delivery: ${useTelegram ? "Telegram" : "saved to folder (Telegram not configured)"} — vision gate: ${visionEnabled() ? "on" : "off"}`);
 
   onEvent(`launching browser (${headless ? "headless" : "visible"})…`);
   const browser: Browser = await chromium.launch({ headless });
   const page: Page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
-  const captures: CaptureLog[] = [];
-  const capturedSrcs = new Set<string>();
   const history: string[] = [];
   let steps = 0;
 
   try {
     await page.addInitScript({ content: "globalThis.__name = globalThis.__name || function (f) { return f; };" });
-    onEvent(`checking site: ${startUrl}`);
-    await page.goto(startUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+    onEvent(`checking site: ${sites[siteIdx]}`);
+    await page.goto(sites[siteIdx], { waitUntil: "domcontentloaded", timeout: 45000 });
     await page.waitForTimeout(1500);
     onEvent(`page loaded — scanning for looks…`);
 
+    let lastFingerprint = "";
+    let stallStreak = 0;
+
     for (let n = 1; n <= maxSteps && captures.length < target; n++) {
+      if (shouldStop()) {
+        onEvent(`step ${n}: stopped by user`);
+        break;
+      }
+      if (Date.now() >= deadline) {
+        onEvent(`step ${n}: ⏱ time budget reached — wrapping up`);
+        break;
+      }
       steps = n;
       const obs = await observeContent(page);
+
+      const fingerprint = obs.images.map((e) => e.src).join(",");
+      stallStreak = fingerprint === lastFingerprint ? stallStreak + 1 : 0;
+      lastFingerprint = fingerprint;
+
+      if (stallStreak >= 3) {
+        siteIdx++;
+        if (siteIdx >= sites.length) {
+          onEvent(`  ⚠ stuck — no new content after repeated actions, and no more sites to try. Stopping.`);
+          break;
+        }
+        onEvent(`  ⚠ stuck — no new content after repeated actions; trying next site: ${sites[siteIdx]}`);
+        history.push(`${n}. auto-switched site (stalled) → ${sites[siteIdx]}`);
+        try {
+          await page.goto(sites[siteIdx], { waitUntil: "domcontentloaded", timeout: 45000 });
+          await page.waitForTimeout(1500);
+        } catch (err) {
+          onEvent(`  ! failed to load ${sites[siteIdx]}: ${String(err).split("\n")[0]}`);
+        }
+        lastFingerprint = "";
+        stallStreak = 0;
+        continue;
+      }
 
       let action: Action;
       try {
@@ -134,6 +265,9 @@ export async function scoutTrends(
             onEvent(
               `  ✗ rejected — ${analysis.is_look ? `${analysis.gender} · ${analysis.tags.join(", ") || "look"}` : "not a wearable look"} doesn't match "${topic}"`
             );
+            if (analysis.is_look) {
+              fallbackCandidates.push({ shot, caption: analysis.caption || action.caption, source: obs.url, gender: analysis.gender });
+            }
             history.push(`${n}. rejected capture[${action.idx}] — vision mismatch (${analysis.gender}/${analysis.tags.join(",")})`);
             continue;
           }
@@ -190,7 +324,12 @@ export async function scoutTrends(
       }
     }
 
-    writeFileSync(path.join(runDir, "captures.json"), JSON.stringify({ topic, startUrl, captures }, null, 2));
+    await deliverFallback();
+
+    writeFileSync(
+      path.join(runDir, "captures.json"),
+      JSON.stringify({ topic, startUrl: sites[0], sitesVisited: sites.slice(0, siteIdx + 1), captures }, null, 2)
+    );
     return { captures, steps, runDir };
   } finally {
     await browser.close();

@@ -15,7 +15,6 @@ const SYSTEM = `You turn a spoken or typed request to browse fashion trends into
 - start_url: a site URL only if the user explicitly named one, otherwise null.
 Do not invent constraints the user did not express.`;
 
-// Natural language request
 export async function interpretFashionRequest(text: string): Promise<FashionRequest> {
   const fallback: FashionRequest = { topic: text, count: 3, start_url: null };
   const timeout = new Promise<FashionRequest>((_, reject) =>

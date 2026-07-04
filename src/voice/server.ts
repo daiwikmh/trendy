@@ -24,8 +24,6 @@ for (const key of ["DEEPGRAM_API_KEY", "NVIDIA_API_KEY"]) {
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
-// The UI now lives in trendy/app/ (a separate Next.js dev server), so this
-// backend is API/WS-only — allow cross-origin requests from the Next dev origin.
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", req.headers.origin ?? "*");
   res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -60,6 +58,7 @@ interface Session {
   qIndex: number;
   answers: QAEntry[];
   scouting: boolean;
+  stopRequested: boolean;
 }
 
 const server = createServer(app);
@@ -76,6 +75,7 @@ wss.on("connection", (ws: WebSocket) => {
     qIndex: 0,
     answers: [],
     scouting: false,
+    stopRequested: false,
   };
 
   const send = (msg: object) => {
@@ -113,6 +113,8 @@ wss.on("connection", (ws: WebSocket) => {
     const dg = s.dg;
     if (!dg) return;
     s.dg = null;
+    
+    await new Promise((r) => setTimeout(r, 400));
     await new Promise<void>((resolve) => {
       const t = setTimeout(resolve, 1500);
       dg.on(LiveTranscriptionEvents.Close, () => {
@@ -146,6 +148,7 @@ wss.on("connection", (ws: WebSocket) => {
       );
 
       s.scouting = true;
+      s.stopRequested = false;
       send({ type: "scout_started" });
       const result = await scoutTrends(req.topic, {
         startUrl: req.start_url ?? undefined,
@@ -156,6 +159,7 @@ wss.on("connection", (ws: WebSocket) => {
           send({ type: "scout_capture", capture });
           narrate(`Captured a look: ${capture.caption}`);
         },
+        shouldStop: () => s.stopRequested,
       });
       send({ type: "scout_done", captures: result.captures, steps: result.steps });
       narrate(
@@ -211,9 +215,14 @@ wss.on("connection", (ws: WebSocket) => {
       if (msg.type === "start_listening") startListening();
       else if (msg.type === "stop_listening") await stopListening();
       else if (msg.type === "scout") {
-        // Typed request from the UI, bypassing STT.
+//typed msg
         send({ type: "transcript", text: String(msg.text ?? ""), final: true });
         await handleScoutRequest(String(msg.text ?? ""));
+      } else if (msg.type === "stop") {
+        if (s.scouting) {
+          s.stopRequested = true;
+          send({ type: "scout_status", text: "stopping…" });
+        }
       } else if (msg.type === "resume") {
         send({ type: "status", text: "Reading your resume and finding gaps…" });
         s.questions = await findGaps(String(msg.text));

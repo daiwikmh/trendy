@@ -29,9 +29,6 @@ export interface LogLine {
   text: string;
 }
 
-// Talks to the trendy backend (src/voice/server.ts) over a WebSocket: streams
-// mic audio up, receives transcript / narration / scout_* events down, and
-// accumulates every event into a `logs` stream for the terminal UI.
 export function useTrendy() {
   const wsRef = useRef<WebSocket | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -207,6 +204,13 @@ export function useTrendy() {
     [log]
   );
 
+  const stopScout = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: "stop" }));
+    log("net", "requested stop…");
+  }, [log]);
+
   return {
     connected,
     listening,
@@ -224,5 +228,6 @@ export function useTrendy() {
     startMic,
     stopMic,
     sendText,
+    stopScout,
   };
 }

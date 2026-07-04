@@ -1,7 +1,4 @@
-// Lightweight vision gate: looks at ONE candidate screenshot and decides whether
-// it actually matches the request — focused on garment tags, colors, and gender.
-// Uses a small VLM and runs only on images the agent already chose to capture,
-// so it stays cheap. Set VISION=0 to disable, NVIDIA_VISION_MODEL to swap models.
+//Set VISION=0 to disable, NVIDIA_VISION_MODEL to swap models.
 const VISION_MODEL = process.env.NVIDIA_VISION_MODEL ?? "meta/llama-3.2-11b-vision-instruct";
 const VISION_ENABLED = process.env.VISION !== "0";
 const URL = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -17,6 +14,13 @@ export interface LookAnalysis {
 
 export function visionEnabled(): boolean {
   return VISION_ENABLED;
+}
+
+export function inferGender(topic: string): "men" | "women" | null {
+  const t = topic.toLowerCase();
+  if (/\b(men|man|male|mens|guys|him|his)\b/.test(t)) return "men";
+  if (/\b(women|woman|female|womens|girls|her|hers)\b/.test(t)) return "women";
+  return null;
 }
 
 function prompt(request: string): string {
@@ -43,7 +47,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function analyzeLook(jpeg: Buffer, request: string): Promise<LookAnalysis | null> {
   if (!VISION_ENABLED) return null;
   const b64 = jpeg.toString("base64");
-  if (b64.length > 180_000) return null; // too large for inline API — skip the gate gracefully
+  if (b64.length > 5_000_000) return null; // too large for inline API — skip the gate gracefully
 
   const body = JSON.stringify({
     model: VISION_MODEL,
@@ -60,8 +64,6 @@ export async function analyzeLook(jpeg: Buffer, request: string): Promise<LookAn
     ],
   });
 
-  // Retry transient failures (429/5xx/network) so a momentary blip doesn't
-  // silently drop the quality gate and let an unverified image through.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(URL, {

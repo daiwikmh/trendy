@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Square } from "lucide-react";
 import type { LogLevel, useTrendy } from "@/lib/useTrendy";
 
 type Trendy = ReturnType<typeof useTrendy>;
@@ -28,7 +29,7 @@ function time(ts: number) {
 }
 
 export default function TerminalSection({ trendy }: { trendy: Trendy }) {
-  const { logs, connected, scoutPhase } = trendy;
+  const { logs, connected, scoutPhase, stopScout } = trendy;
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,6 +59,16 @@ export default function TerminalSection({ trendy }: { trendy: Trendy }) {
             <span className="w-3 h-3 rounded-full bg-green-400/70" />
             <span className="ml-3 text-white/40 text-xs font-mono">trendy://scout</span>
             <span className="ml-auto flex items-center gap-2 text-xs font-mono">
+              {running && (
+                <button
+                  onClick={stopScout}
+                  className="flex items-center gap-1 rounded-full px-2.5 py-1 text-red-300 bg-red-400/10 hover:bg-red-400/20 transition-colors"
+                  aria-label="Stop scouting"
+                >
+                  <Square className="w-2.5 h-2.5" fill="currentColor" />
+                  stop
+                </button>
+              )}
               <span
                 className={`w-2 h-2 rounded-full ${
                   connected ? "bg-emerald-400" : "bg-red-400"
