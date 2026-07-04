@@ -17,10 +17,7 @@ export interface Observation {
   elements: Element[];
 }
 
-// Runs in the page. Tags each interactive element with data-brow-idx and
-// returns a labeled descriptor for each. Label resolution follows the order
-// forms actually use: <label for>, wrapping <label>, aria-label/-labelledby,
-// placeholder, then nearby text.
+// Runs in the page.
 export async function observe(page: Page): Promise<Observation> {
   return page.evaluate(() => {
     const sel =
@@ -53,10 +50,10 @@ export async function observe(page: Page): Promise<Observation> {
     };
     const out: any[] = [];
     let i = 0;
-    document.querySelectorAll("[data-brow-idx]").forEach((e) => e.removeAttribute("data-brow-idx"));
+    document.querySelectorAll("[data-trendy-idx]").forEach((e) => e.removeAttribute("data-trendy-idx"));
     for (const el of Array.from(document.querySelectorAll(sel)) as any[]) {
       if (!vis(el)) continue;
-      el.setAttribute("data-brow-idx", String(i));
+      el.setAttribute("data-trendy-idx", String(i));
       const tag = el.tagName.toLowerCase();
       const type = (el.getAttribute("type") || el.getAttribute("role") || "").toLowerCase();
       const showText = tag === "button" || tag === "a" || type === "option" || type === "menuitem";
@@ -127,15 +124,15 @@ export async function observeContent(page: Page): Promise<ContentObservation> {
       if (a && a.getAttribute("title")) return a.getAttribute("title").slice(0, 140);
       return "";
     };
-    document.querySelectorAll("[data-brow-idx]").forEach((e) => e.removeAttribute("data-brow-idx"));
+    document.querySelectorAll("[data-trendy-idx]").forEach((e) => e.removeAttribute("data-trendy-idx"));
     let i = 0;
     const images: any[] = [];
     for (const el of Array.from(document.querySelectorAll("img")) as any[]) {
       const s = getComputedStyle(el);
       if (s.display === "none" || s.visibility === "hidden") continue;
       const r = el.getBoundingClientRect();
-      if (r.width < 140 || r.height < 140) continue; // skip icons/logos/avatars
-      el.setAttribute("data-brow-idx", String(i));
+      if (r.width < 200 || r.height < 200) continue; // skip icons/logos/thumbnails; prefer editorial photos
+      el.setAttribute("data-trendy-idx", String(i));
       images.push({
         idx: i,
         alt: (el.getAttribute("alt") || "").trim().slice(0, 140),
@@ -156,7 +153,7 @@ export async function observeContent(page: Page): Promise<ContentObservation> {
       if (r.width < 1 || r.height < 1) continue;
       const t = textOf(el).slice(0, 60);
       if (!t) continue;
-      el.setAttribute("data-brow-idx", String(i));
+      el.setAttribute("data-trendy-idx", String(i));
       controls.push({ idx: i, tag: el.tagName.toLowerCase(), text: t });
       i++;
       if (controls.length >= 25) break;

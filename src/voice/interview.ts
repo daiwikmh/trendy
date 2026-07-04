@@ -1,5 +1,5 @@
-import { jsonChat } from "./llm.js";
-import { GapQuestionsSchema, type GapQuestion } from "./types.js";
+import { jsonChat } from "../shared/llm.js";
+import { GapQuestionsSchema, type GapQuestion } from "../shared/types.js";
 
 const SYSTEM = `You are onboarding a job applicant. Given their resume text, identify information that job application forms always require but the resume does not answer. Output ONLY JSON:
 { "questions": [ { "field": "snake_case_key", "question": "spoken-friendly question" } ] }

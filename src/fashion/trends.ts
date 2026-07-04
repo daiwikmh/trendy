@@ -1,4 +1,4 @@
-import "./env.js";
+import "../shared/env.js";
 import { scoutTrends } from "./fashion.js";
 
 const topic = process.argv[2] || "current fashion trends";

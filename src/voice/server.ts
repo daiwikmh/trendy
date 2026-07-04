@@ -1,4 +1,4 @@
-import "./env.js";
+import "../shared/env.js";
 import express from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
@@ -7,13 +7,14 @@ import { deepgram } from "./deepgram.js";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { interpret } from "./intent.js";
 import { findGaps } from "./interview.js";
 import { synthesize } from "./tts.js";
-import type { GapQuestion, QAEntry } from "./types.js";
+import { interpretFashionRequest } from "../fashion/request.js";
+import { scoutTrends, type CaptureLog } from "../fashion/fashion.js";
+import type { GapQuestion, QAEntry } from "../shared/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_DIR = path.join(__dirname, "..", "..", "data");
 const QA_BANK = path.join(DATA_DIR, "qa_bank.json");
 mkdirSync(DATA_DIR, { recursive: true });
 
@@ -23,7 +24,15 @@ for (const key of ["DEEPGRAM_API_KEY", "NVIDIA_API_KEY"]) {
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
-app.use(express.static(path.join(__dirname, "..", "public")));
+// The UI now lives in trendy/app/ (a separate Next.js dev server), so this
+// backend is API/WS-only — allow cross-origin requests from the Next dev origin.
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", req.headers.origin ?? "*");
+  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
 app.post("/tts", async (req, res) => {
   try {
@@ -50,6 +59,7 @@ interface Session {
   questions: GapQuestion[];
   qIndex: number;
   answers: QAEntry[];
+  scouting: boolean;
 }
 
 const server = createServer(app);
@@ -65,6 +75,7 @@ wss.on("connection", (ws: WebSocket) => {
     questions: [],
     qIndex: 0,
     answers: [],
+    scouting: false,
   };
 
   const send = (msg: object) => {
@@ -116,30 +127,49 @@ wss.on("connection", (ws: WebSocket) => {
       narrate("I didn't catch that. Try again?");
       return;
     }
-    if (s.mode === "command") await handleCommand(utterance);
+    if (s.mode === "command") await handleScoutRequest(utterance);
     else await handleAnswer(utterance);
   }
 
-  async function handleCommand(utterance: string) {
-    send({ type: "status", text: "Thinking…" });
+  async function handleScoutRequest(utterance: string) {
+    if (s.scouting) {
+      narrate("I'm still scouting the last request — one moment.");
+      return;
+    }
+    send({ type: "status", text: "Interpreting request…" });
     try {
-      const result = await interpret(utterance);
+      const req = await interpretFashionRequest(utterance);
       send({ type: "status", text: "" });
-      if (result.kind === "chat") {
-        narrate(result.reply);
-        return;
-      }
-      const job = result.job;
-      send({ type: "job_request", data: job });
-      const where = job.companies_or_urls.length
-        ? ` at ${job.companies_or_urls.join(", ")}`
-        : "";
+      send({ type: "scout_request", data: req });
       narrate(
-        `Got it. Up to ${job.max_applications} applications for ${job.roles.join(" or ")}${where}. Say go when you're ready.`
+        `Got it — scouting "${req.topic}", up to ${req.count} looks. Opening a browser now…`
+      );
+
+      s.scouting = true;
+      send({ type: "scout_started" });
+      const result = await scoutTrends(req.topic, {
+        startUrl: req.start_url ?? undefined,
+        target: req.count,
+        headless: process.env.HEADLESS === "1",
+        onEvent: (text) => send({ type: "scout_status", text }),
+        onCapture: (capture: CaptureLog) => {
+          send({ type: "scout_capture", capture });
+          narrate(`Captured a look: ${capture.caption}`);
+        },
+      });
+      send({ type: "scout_done", captures: result.captures, steps: result.steps });
+      narrate(
+        result.captures.length
+          ? `Done — captured ${result.captures.length} look${result.captures.length === 1 ? "" : "s"}${
+              result.captures[0]?.delivered === "telegram" ? ", sent to your Telegram" : ", saved locally"
+            }.`
+          : "I browsed but didn't find a strong match — try a more specific topic."
       );
     } catch (err) {
       send({ type: "error", error: String(err) });
-      narrate("Sorry, I couldn't parse that. Could you rephrase?");
+      narrate("Sorry, something went wrong while scouting. Could you try again?");
+    } finally {
+      s.scouting = false;
     }
   }
 
@@ -180,7 +210,11 @@ wss.on("connection", (ws: WebSocket) => {
     try {
       if (msg.type === "start_listening") startListening();
       else if (msg.type === "stop_listening") await stopListening();
-      else if (msg.type === "resume") {
+      else if (msg.type === "scout") {
+        // Typed request from the UI, bypassing STT.
+        send({ type: "transcript", text: String(msg.text ?? ""), final: true });
+        await handleScoutRequest(String(msg.text ?? ""));
+      } else if (msg.type === "resume") {
         send({ type: "status", text: "Reading your resume and finding gaps…" });
         s.questions = await findGaps(String(msg.text));
         s.qIndex = 0;
@@ -216,4 +250,4 @@ const onError = (err: NodeJS.ErrnoException) => {
 };
 server.on("error", onError);
 wss.on("error", onError);
-server.listen(PORT, () => console.log(`brow L0 voice layer → http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`trendy L0 voice layer → http://localhost:${PORT}`));

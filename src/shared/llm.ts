@@ -6,7 +6,10 @@ const llm = new OpenAI({
   baseURL: "https://integrate.api.nvidia.com/v1",
 });
 
-const MODEL = "z-ai/glm-5.2";
+// Swap models without touching code: set NVIDIA_MODEL in .env.local to any id
+// from the NVIDIA catalog (e.g. nvidia/nemotron-3-super-120b-a12b,
+// meta/llama-3.3-70b-instruct, qwen/qwen3-next-80b-a3b-instruct).
+const MODEL = process.env.NVIDIA_MODEL ?? "z-ai/glm-5.2";
 
 function extractJson(raw: string): unknown {
   let s = raw.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();

@@ -7,6 +7,7 @@ import AboutSection from "@/components/AboutSection";
 import FeaturedVideoSection from "@/components/FeaturedVideoSection";
 import PhilosophySection from "@/components/PhilosophySection";
 import ServicesSection from "@/components/ServicesSection";
+import TerminalSection from "@/components/TerminalSection";
 
 type Trendy = ReturnType<typeof useTrendy>;
 
@@ -270,6 +271,7 @@ export default function Home() {
         </div>
       </div>
 
+      <TerminalSection trendy={trendy} />
       <AboutSection />
       <FeaturedVideoSection />
       <PhilosophySection />

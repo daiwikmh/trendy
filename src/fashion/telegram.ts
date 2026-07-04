@@ -1,5 +1,3 @@
-// Sends a photo to Telegram via the Bot API. Needs a BotFather token and a
-// chat id (message your bot once, then read it from getUpdates, or use @userinfobot).
 export function telegramConfigured(): boolean {
   return !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
 }
@@ -12,7 +10,7 @@ export async function sendPhoto(image: Buffer, caption: string): Promise<void> {
   const form = new FormData();
   form.append("chat_id", chat);
   form.append("caption", caption.slice(0, 1024));
-  form.append("photo", new Blob([new Uint8Array(image)], { type: "image/png" }), "design.png");
+  form.append("photo", new Blob([new Uint8Array(image)], { type: "image/jpeg" }), "look.jpg");
 
   const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: "POST", body: form });
   if (!res.ok) throw new Error(`Telegram sendPhoto failed: ${res.status} ${await res.text()}`);

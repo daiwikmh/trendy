@@ -1,29 +1,18 @@
-# brow — L0 Voice Layer
+# trendy
 
-Streaming voice front-end for the job-application agent. Two jobs:
+Point an AI agent at a real browser and watch it click, scroll, screenshot, and
+send the fashion looks worth knowing straight to Telegram — by voice or by typing.
 
-1. **Command intent** — speak a request ("apply to 3 backend roles at Stripe and Ramp, remote only"); Deepgram streams STT, GLM-5.2 parses it into a typed `JobRequest`, and the agent narrates back what it heard via Deepgram Aura TTS.
-2. **Onboarding interview** — paste a resume; the LLM finds gaps the resume doesn't answer (work authorization, notice period, expected comp…), asks them aloud one at a time, and writes each answer to a persistent Q&A bank (`data/qa_bank.json`) tagged `source: interview` so they're asked *once, ever*.
+The fashion scout browses an editorial site, decides what's a genuinely
+striking/on-topic design, screenshots it, and sends it to Telegram.
 
-## Stack
-- **STT/TTS:** Deepgram (`nova-3` streaming listen, `aura-2` speak) — SDK v4.
-- **LLM:** GLM-5.2 via NVIDIA NIM, through the OpenAI SDK (`baseURL` override).
-- **Server:** Express + `ws`; browser streams mic audio (WebM/Opus) over a WebSocket.
+The UI lives in `trendy/app/` (Next.js); the agent and voice layer live in `src/`
+(a plain Node/Express + WebSocket backend). They're two separate processes.
 
-## Run
-```bash
-cp .env.example .env    # fill in DEEPGRAM_API_KEY and NVIDIA_API_KEY
-npm install
-npm run dev             # http://localhost:3000
-```
-The server boots without keys (prints warnings); voice/LLM calls return a clean error until keys are set.
+Voice or typed requests from the UI are parsed into a scout request and run through
+the fashion agent live — a real, visible browser opens on your machine and you watch
+it work while the UI streams status and captures over the WebSocket.
 
-## Layout
-- `src/server.ts` — HTTP + WebSocket, per-connection session state machine (command ↔ interview).
-- `src/intent.ts` — transcript → `JobRequest` (Zod-validated).
-- `src/interview.ts` — resume → gap questions.
-- `src/tts.ts` / `src/deepgram.ts` — Aura synthesis, lazy Deepgram client.
-- `src/types.ts` — `JobRequest`, `GapQuestion`, `QAEntry` schemas.
-- `public/index.html` — mic capture, live transcript, narration playback, review panes.
 
-Next layers (L1 candidate world model, L2 orchestrator, L3 browser execution) build on the `JobRequest` and Q&A bank this layer produces.
+## Every run leaves an audit trail
+`data/captures/<timestamp>/` — one screenshot per capture + `captures.json`.

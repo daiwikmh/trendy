@@ -1,14 +1,13 @@
 {
-  "name": "brow",
+  "name": "trendy",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsx src/server.ts",
+    "dev": "tsx src/voice/server.ts",
     "build": "tsc",
-    "apply": "tsx src/apply.ts",
-    "trends": "tsx src/trends.ts"
+    "trends": "tsx src/fashion/trends.ts"
   },
   "keywords": [],
   "author": "",
